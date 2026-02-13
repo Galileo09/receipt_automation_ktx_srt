@@ -3,6 +3,7 @@ import threading
 import datetime
 import json
 import os
+import traceback
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QLineEdit, QDateEdit, QPushButton, QTextEdit, QMessageBox, QFileDialog)
 from PyQt6.QtCore import QDate, pyqtSignal, QObject
@@ -161,7 +162,8 @@ class SRTLauncher(QWidget):
             else:
                 self.signals.log_signal.emit("로그인 실패 또는 중단됨.")
         except Exception as e:
-            self.signals.log_signal.emit(f"오류 발생: {e}")
+            error_msg = traceback.format_exc()
+            self.signals.log_signal.emit(f"오류 발생:\n{error_msg}")
         finally:
             self.manager.close()
             self.signals.finished_signal.emit()
