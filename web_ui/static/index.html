@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>영수증 자동화 대시보드</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── 테마 변수 ── */
+    :root {
+      --bg:        #f0f2f5;
+      --card-bg:   #ffffff;
+      --text:      #333333;
+      --text-sub:  #666666;
+      --border:    #d1d5db;
+      --input-bg:  #ffffff;
+      --logpath-bg:#f8fafc;
+      --shadow:    rgba(0,0,0,.08);
+      --title:     #1a1a1a;
+    }
+
+    body.dark {
+      --bg:        #0f172a;
+      --card-bg:   #1e293b;
+      --text:      #e2e8f0;
+      --text-sub:  #94a3b8;
+      --border:    #334155;
+      --input-bg:  #273549;
+      --logpath-bg:#162032;
+      --shadow:    rgba(0,0,0,.3);
+      --title:     #f1f5f9;
+    }
+
+    body {
+      font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      transition: background .25s, color .25s;
+    }
+
+    /* ── 헤더 ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--title);
+      letter-spacing: -0.3px;
+    }
+
+    .btn-settings {
+      position: absolute;
+      right: 0;
+      background: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: #334155;
+      transition: background .15s;
+    }
+    .btn-settings:hover { background: #cbd5e1; }
+    body.dark .btn-settings { background: #334155; border-color: #475569; color: #e2e8f0; }
+    body.dark .btn-settings:hover { background: #475569; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1000px;
+      margin: 0 auto 20px;
+    }
+
+    @media (max-width: 680px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── 설정 모달 ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.4);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 28px;
+      width: 300px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    .modal h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 18px;
+      color: var(--title);
+    }
+
+    .theme-options { display: flex; gap: 10px; }
+
+    .theme-btn {
+      flex: 1;
+      padding: 12px 8px;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--input-bg);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .15s, background .15s;
+    }
+    .theme-btn .icon { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+    .theme-btn:hover { border-color: #3b82f6; }
+    .theme-btn.active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+    body.dark .theme-btn.active { background: #1e3a5f; color: #93c5fd; border-color: #3b82f6; }
+
+    .modal-close {
+      display: block;
+      margin-top: 18px;
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 8px;
+      background: var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .modal-close:hover { opacity: .8; }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px var(--shadow);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: background .25s;
+    }
+
+    .card-email {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .card-title { font-size: 1.1rem; font-weight: 700; }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .badge.idle    { background: #e9ecef; color: #555; }
+    .badge.running { background: #dbeafe; color: #1d4ed8; animation: pulse 1.2s infinite; }
+    .badge.done    { background: #dcfce7; color: #166534; }
+    .badge.error   { background: #fee2e2; color: #991b1b; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 0.82rem; color: var(--text-sub); font-weight: 600; }
+
+    input[type="date"],
+    input[type="text"],
+    input[type="email"] {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      outline: none;
+      background: var(--input-bg);
+      color: var(--text);
+      transition: border-color .15s, background .25s;
+      width: 100%;
+    }
+    input:focus { border-color: #3b82f6; }
+
+    .path-row { display: flex; gap: 6px; }
+    .path-row input { flex: 1; }
+
+    .btn-browse {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: var(--logpath-bg);
+      color: var(--text);
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-browse:hover { background: var(--border); }
+
+    .actions { display: flex; gap: 8px; }
+
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active   { transform: scale(.97); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-start  { background: #2563eb; color: #fff; }
+    .btn-start:hover:not(:disabled)  { background: #1d4ed8; }
+    .btn-stop   { background: #ef4444; color: #fff; }
+    .btn-stop:hover:not(:disabled)   { background: #dc2626; }
+    .btn-email  { background: #059669; color: #fff; }
+    .btn-email:hover:not(:disabled)  { background: #047857; }
+    .btn-google { background: #ea4335; color: #fff; flex: none; padding: 10px 16px; }
+    .btn-google:hover:not(:disabled) { background: #c5221f; }
+    .btn-save   { background: #7c3aed; color: #fff; flex: none; padding: 10px 20px; }
+    .btn-save:hover:not(:disabled)   { background: #6d28d9; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+    .check-row input[type="checkbox"] {
+      width: 16px; height: 16px;
+      accent-color: #2563eb;
+      cursor: pointer;
+    }
+
+    /* ── 프로그레스 스텝 ── */
+    .step-progress {
+      display: flex;
+      align-items: flex-start;
+      padding: 12px 4px 4px;
+    }
+    .step-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      top: 13px;
+      left: 50%;
+      width: 100%;
+      height: 2px;
+      background: var(--border);
+      transition: background .3s;
+    }
+    .step-item.done:not(:last-child)::after   { background: #059669; }
+    .step-item.active:not(:last-child)::after { background: #bfdbfe; }
+    body.dark .step-item.active:not(:last-child)::after { background: #1e3a5f; }
+
+    .step-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text-sub);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem; font-weight: 700;
+      position: relative; z-index: 1;
+      transition: all .25s;
+    }
+    .step-item.done   .step-circle { background: #059669; border-color: #059669; color: #fff; }
+    .step-item.active .step-circle { background: #2563eb; border-color: #2563eb; color: #fff; animation: pulse 1.2s infinite; }
+    .step-item.error  .step-circle { background: #ef4444; border-color: #ef4444; color: #fff; }
+
+    .step-label {
+      font-size: 0.65rem;
+      color: var(--text-sub);
+      margin-top: 5px;
+      white-space: nowrap;
+      transition: color .25s;
+    }
+    .step-item.done   .step-label { color: #059669; font-weight: 600; }
+    .step-item.active .step-label { color: #2563eb; font-weight: 600; }
+    .step-item.error  .step-label { color: #ef4444; }
+
+    .email-setting-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .email-setting-row .field { flex: 1; }
+
+    /* ── 토스트 스택 ── */
+    #toast-stack {
+      position: fixed; bottom: 24px; right: 24px;
+      display: flex; flex-direction: column; gap: 8px;
+      z-index: 999; pointer-events: none;
+    }
+    .toast-item {
+      background: #1e293b; color: #f1f5f9;
+      padding: 10px 16px; border-radius: 8px;
+      font-size: 0.85rem; min-width: 200px; max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25);
+      border-left: 3px solid #475569;
+      animation: toastIn .25s ease;
+      transition: opacity .3s;
+    }
+    .toast-item.success { border-left-color: #22c55e; }
+    .toast-item.error   { border-left-color: #ef4444; }
+    .toast-item.info    { border-left-color: #3b82f6; }
+    .toast-item.warning { border-left-color: #f59e0b; }
+    @keyframes toastIn {
+      from { transform: translateX(20px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <!-- 설정 모달 -->
+  <div class="modal-overlay" id="modal-settings" onclick="closeSettingsModal(event)">
+    <div class="modal">
+      <h2>⚙️ 화면 설정</h2>
+      <div class="theme-options">
+        <button class="theme-btn active" id="theme-light" onclick="setTheme('light')">
+          <span class="icon">☀️</span>라이트 모드
+        </button>
+        <button class="theme-btn" id="theme-dark" onclick="setTheme('dark')">
+          <span class="icon">🌙</span>다크 모드
+        </button>
+      </div>
+      <hr style="border:none; border-top:1px solid var(--border); margin: 16px 0;" />
+      <label class="check-row">
+        <input type="checkbox" id="debug-mode" onchange="saveDebugMode()" />
+        디버깅 모드 (로그 파일 생성)
+      </label>
+      <button class="modal-close" onclick="closeSettingsModal()">닫기</button>
+    </div>
+  </div>
+
+  <div class="header">
+    <h1>🚄 영수증 자동화 대시보드</h1>
+    <button class="btn-settings" onclick="openSettingsModal()" title="설정">⚙️</button>
+  </div>
+
+  <div class="grid">
+    <!-- KTX -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">KTX 영수증 자동화</span>
+        <span class="badge idle" id="badge-ktx">대기중</span>
+      </div>
+      <div class="field">
+        <label>시작일</label>
+        <input type="date" id="ktx-start" />
+      </div>
+      <div class="field">
+        <label>종료일</label>
+        <input type="date" id="ktx-end" />
+      </div>
+      <div class="field">
+        <label>저장 경로</label>
+        <div class="path-row">
+          <input type="text" id="ktx-path" placeholder="예: C:\Users\...\Desktop\출장복명" onblur="savePath('ktx')" />
+          <button class="btn-browse" onclick="browsePath('ktx')">📁 찾기</button>
+        </div>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="ktx-auto-email" checked />
+        완료 후 자동으로 메일 발송
+      </label>
+      <div class="actions">
+        <button class="btn btn-start" id="btn-ktx-start" onclick="startAutomation('ktx')">▶ 시작</button>
+        <button class="btn btn-stop"  id="btn-ktx-stop"  onclick="stopAutomation('ktx')" disabled>■ 중지</button>
+        <button class="btn btn-email" id="btn-ktx-email" onclick="sendEmail('ktx')" disabled>📧 발송</button>
+      </div>
+      <div class="step-progress">
+        <div class="step-item" id="steps-ktx-0"><div class="step-circle">1</div><div class="step-label">시작</div></div>
+        <div class="step-item" id="steps-ktx-1"><div class="step-circle">2</div><div class="step-label">로그인</div></div>
+        <div class="step-item" id="steps-ktx-2"><div class="step-circle">3</div><div class="step-label">캡처</div></div>
+        <div class="step-item" id="steps-ktx-3"><div class="step-circle">4</div><div class="step-label">메일</div></div>
+        <div class="step-item" id="steps-ktx-4"><div class="step-circle">5</div><div class="step-label">완료</div></div>
+      </div>
+    </div>
+
+    <!-- SRT -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">SRT 영수증 자동화</span>
+        <span class="badge idle" id="badge-srt">대기중</span>
+      </div>
+      <div class="field">
+        <label>시작일</label>
+        <input type="date" id="srt-start" />
+      </div>
+      <div class="field">
+        <label>종료일</label>
+        <input type="date" id="srt-end" />
+      </div>
+      <div class="field">
+        <label>저장 경로</label>
+        <div class="path-row">
+          <input type="text" id="srt-path" placeholder="예: C:\Users\...\Desktop\출장복명" onblur="savePath('srt')" />
+          <button class="btn-browse" onclick="browsePath('srt')">📁 찾기</button>
+        </div>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="srt-auto-email" checked />
+        완료 후 자동으로 메일 발송
+      </label>
+      <div class="actions">
+        <button class="btn btn-start" id="btn-srt-start" onclick="startAutomation('srt')">▶ 시작</button>
+        <button class="btn btn-stop"  id="btn-srt-stop"  onclick="stopAutomation('srt')" disabled>■ 중지</button>
+        <button class="btn btn-email" id="btn-srt-email" onclick="sendEmail('srt')" disabled>📧 발송</button>
+      </div>
+      <div class="step-progress">
+        <div class="step-item" id="steps-srt-0"><div class="step-circle">1</div><div class="step-label">시작</div></div>
+        <div class="step-item" id="steps-srt-1"><div class="step-circle">2</div><div class="step-label">로그인</div></div>
+        <div class="step-item" id="steps-srt-2"><div class="step-circle">3</div><div class="step-label">캡처</div></div>
+        <div class="step-item" id="steps-srt-3"><div class="step-circle">4</div><div class="step-label">메일</div></div>
+        <div class="step-item" id="steps-srt-4"><div class="step-circle">5</div><div class="step-label">완료</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gmail 설정 -->
+  <div class="card card-email">
+    <div class="card-header">
+      <span class="card-title">📧 Gmail 발송 설정</span>
+      <span class="badge idle" id="gmail-badge">확인 중...</span>
+    </div>
+    <div class="email-setting-row">
+      <div class="field">
+        <label>수신자 이메일</label>
+        <input type="email" id="gmail-recipient" placeholder="recipient@example.com" />
+      </div>
+      <button class="btn btn-save" onclick="saveSettings()">💾 저장</button>
+      <button class="btn btn-google" id="btn-gmail-login" onclick="gmailLogin()">🔑 Gmail 로그인</button>
+    </div>
+    <p id="gmail-hint" style="font-size:0.8rem; color:#888; display:none;">
+      브라우저가 열리면 Gmail에 로그인해주세요. 받은편지함까지 이동하면 자동으로 닫힙니다.
+    </p>
+  </div>
+
+  <div id="toast-stack"></div>
+
+<script>
+// ── 테마 ─────────────────────────────────────────────────────────────────────
+function setTheme(mode) {
+  document.body.classList.toggle("dark", mode === "dark");
+  document.getElementById("theme-light").classList.toggle("active", mode === "light");
+  document.getElementById("theme-dark").classList.toggle("active",  mode === "dark");
+  localStorage.setItem("theme", mode);
+}
+
+function openSettingsModal() {
+  document.getElementById("modal-settings").classList.add("open");
+}
+
+function closeSettingsModal(e) {
+  if (!e || e.target === document.getElementById("modal-settings"))
+    document.getElementById("modal-settings").classList.remove("open");
+}
+
+// 저장된 테마 적용
+setTheme(localStorage.getItem("theme") || "light");
+
+// ── 날짜 유틸 ────────────────────────────────────────────────────────────────
+const toInputDate = d => d.toISOString().slice(0, 10);
+const toApiDate   = v => v.replace(/-/g, "");
+const addDays     = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+
+// ── 초기화 ───────────────────────────────────────────────────────────────────
+const today = new Date();
+document.getElementById("ktx-start").value = toInputDate(addDays(today, -7));
+document.getElementById("ktx-end").value   = toInputDate(today);
+document.getElementById("srt-start").value = toInputDate(addDays(today, -7));
+document.getElementById("srt-end").value   = toInputDate(today);
+(async () => {
+  const s = await fetch("/api/settings").then(r => r.json());
+  document.getElementById("gmail-recipient").value = s.recipient ?? "";
+  document.getElementById("debug-mode").checked    = s.debug_mode ?? false;
+  document.getElementById("ktx-path").value = s.ktx_save_path ?? "";
+  document.getElementById("srt-path").value = s.srt_save_path ?? "";
+})();
+
+// ── 토스트 스택 ───────────────────────────────────────────────────────────────
+function showToast(msg, type = "info", ms = 3500) {
+  const stack = document.getElementById("toast-stack");
+  const item  = document.createElement("div");
+  item.className = `toast-item ${type}`;
+  item.textContent = msg;
+  stack.appendChild(item);
+  setTimeout(() => {
+    item.style.opacity = "0";
+    setTimeout(() => item.remove(), 300);
+  }, ms);
+}
+
+// ── 프로그레스 스텝 ────────────────────────────────────────────────────────────
+const LABEL = { ktx: "KTX", srt: "SRT" };
+
+function getStepIndex(lastMsg, status) {
+  if (status === "done") return 5;
+  if (!lastMsg) return 0;
+  const m = lastMsg;
+  if (m.includes("메일")) return 3;
+  if (m.includes("완료") || m.includes("저장") || m.includes("캡처") ||
+      m.includes("결과") || m.includes("행 ") || m.includes("조회") ||
+      m.includes("날짜") || m.includes("영수증")) return 2;
+  if (m.includes("로그인") || m.includes("이동") || m.includes("login")) return 1;
+  return 0;
+}
+
+function updateSteps(key, stepIdx, status) {
+  for (let i = 0; i < 5; i++) {
+    const el     = document.getElementById(`steps-${key}-${i}`);
+    if (!el) continue;
+    const circle = el.querySelector(".step-circle");
+    el.classList.remove("done", "active", "error");
+
+    if (status === "done") {
+      el.classList.add("done");
+      circle.textContent = "✓";
+    } else if (status === "error") {
+      if (i < stepIdx)      { el.classList.add("done");  circle.textContent = "✓"; }
+      else if (i === stepIdx){ el.classList.add("error"); circle.textContent = "✕"; }
+      else                   { circle.textContent = i + 1; }
+    } else if (status === "running") {
+      if (i < stepIdx)      { el.classList.add("done");   circle.textContent = "✓"; }
+      else if (i === stepIdx){ el.classList.add("active"); circle.textContent = i + 1; }
+      else                   { circle.textContent = i + 1; }
+    } else {
+      circle.textContent = i + 1; // idle: 번호 초기화
+    }
+  }
+}
+
+// ── 상태 배지 ─────────────────────────────────────────────────────────────────
+const BADGE_TEXT = { idle: "대기중", running: "실행중", done: "완료", error: "오류" };
+
+function setStatus(key, status, lastMsg) {
+  const badge = document.getElementById(`badge-${key}`);
+  badge.className = `badge ${status}`;
+  badge.textContent = BADGE_TEXT[status] ?? status;
+
+  const isRunning = status === "running";
+  const isDone    = status === "done";
+  document.getElementById(`btn-${key}-start`).disabled = isRunning;
+  document.getElementById(`btn-${key}-stop`).disabled  = !isRunning;
+  document.getElementById(`btn-${key}-email`).disabled = !isDone;
+
+  updateSteps(key, getStepIndex(lastMsg, status), status);
+}
+
+// ── 상태 폴링 ─────────────────────────────────────────────────────────────────
+const prevStatus = { ktx: null, srt: null };
+
+async function pollStatus(key) {
+  const d = await fetch(`/api/${key}/status`).then(r => r.json());
+
+  if (prevStatus[key] !== null && prevStatus[key] !== d.status) {
+    if (d.status === "done")  showToast(`${LABEL[key]} 영수증 자동화 완료`, "success");
+    if (d.status === "error") showToast(`${LABEL[key]} 영수증 자동화 오류 발생`, "error");
+  }
+  prevStatus[key] = d.status;
+
+  setStatus(key, d.status, d.last_message);
+  if (d.status === "running") setTimeout(() => pollStatus(key), 2000);
+}
+
+// ── 시작 ─────────────────────────────────────────────────────────────────────
+async function startAutomation(key) {
+  const startVal  = document.getElementById(`${key}-start`).value;
+  const endVal    = document.getElementById(`${key}-end`).value;
+  const savePath  = document.getElementById(`${key}-path`).value.trim();
+  const autoEmail = document.getElementById(`${key}-auto-email`).checked;
+
+  if (!startVal || !endVal) { alert("날짜를 모두 입력해주세요."); return; }
+  if (!savePath)            { alert("저장 경로를 입력해주세요."); return; }
+
+  setStatus(key, "running", "");
+  showToast(`${LABEL[key]} 영수증 자동화 시작 요청 중...`, "info");
+
+  const d = await fetch(`/api/${key}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      start_date: toApiDate(startVal), end_date: toApiDate(endVal),
+      save_path: savePath, auto_send_email: autoEmail,
+    }),
+  }).then(r => r.json());
+
+  if (!d.ok) {
+    setStatus(key, "error", "");
+    showToast(`${LABEL[key]} 시작 실패: ${d.message ?? "오류"}`, "error");
+    return;
+  }
+  showToast(`${LABEL[key]} 영수증 자동화 시작됨`, "info");
+  prevStatus[key] = "running";
+  pollStatus(key);
+}
+
+// ── 중지 ─────────────────────────────────────────────────────────────────────
+async function stopAutomation(key) {
+  await fetch(`/api/${key}/stop`, { method: "POST" });
+  showToast(`${LABEL[key]} 영수증 자동화 중지됨`, "warning");
+  setStatus(key, "idle", "");
+  prevStatus[key] = "idle";
+}
+
+// ── 수동 메일 발송 ────────────────────────────────────────────────────────────
+async function sendEmail(key) {
+  const btn = document.getElementById(`btn-${key}-email`);
+  btn.disabled = true;
+  showToast(`${LABEL[key]} 메일 발송 시작됨`, "info");
+  const d = await fetch("/api/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  }).then(r => r.json());
+
+  if (d.ok) {
+    showToast(`${LABEL[key]} 메일 발송 완료 → ${d.recipient} (${d.count}건)`, "success");
+  } else {
+    showToast(`${LABEL[key]} 메일 발송 실패: ${d.message}`, "error");
+    btn.disabled = false;
+  }
+}
+
+// ── Gmail 연동 ────────────────────────────────────────────────────────────────
+async function checkGmailStatus() {
+  const { connected, logging_in } = await fetch("/api/gmail/status").then(r => r.json());
+  const badge = document.getElementById("gmail-badge");
+  const hint  = document.getElementById("gmail-hint");
+  const btn   = document.getElementById("btn-gmail-login");
+
+  if (logging_in) {
+    badge.className = "badge running"; badge.textContent = "로그인 진행 중...";
+    hint.style.display = "block"; btn.disabled = true;
+    setTimeout(checkGmailStatus, 2000);
+  } else if (connected) {
+    badge.className = "badge done"; badge.textContent = "연동됨 ✓";
+    hint.style.display = "none"; btn.disabled = false; btn.textContent = "🔄 다시 로그인";
+  } else {
+    badge.className = "badge idle"; badge.textContent = "미연동";
+    hint.style.display = "none"; btn.disabled = false; btn.textContent = "🔑 Gmail 로그인";
+  }
+}
+
+async function gmailLogin() {
+  const d = await fetch("/api/gmail/login", { method: "POST" }).then(r => r.json());
+  if (d.ok) {
+    showToast("브라우저가 열립니다. Gmail 로그인 후 받은편지함까지 이동해주세요.");
+    checkGmailStatus();
+  } else {
+    showToast(d.message, 4000);
+  }
+}
+
+// ── 설정 저장 ─────────────────────────────────────────────────────────────────
+async function saveSettings() {
+  const recip = document.getElementById("gmail-recipient").value.trim();
+  if (!recip) { alert("수신자 이메일을 입력해주세요."); return; }
+  const debug = document.getElementById("debug-mode").checked;
+  const d = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient: recip, debug_mode: debug }),
+  }).then(r => r.json());
+  if (d.ok) showToast("설정이 저장되었습니다.");
+}
+
+async function saveDebugMode() {
+  const recip = document.getElementById("gmail-recipient").value.trim();
+  const debug = document.getElementById("debug-mode").checked;
+  await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient: recip, debug_mode: debug }),
+  });
+}
+
+// ── 경로 저장 & 찾기 ──────────────────────────────────────────────────────────
+async function savePath(key) {
+  const val = document.getElementById(`${key}-path`).value.trim();
+  if (!val) return;
+  const d = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient:  document.getElementById("gmail-recipient").value.trim(),
+      debug_mode: document.getElementById("debug-mode").checked,
+      [`${key}_save_path`]: val,
+    }),
+  }).then(r => r.json());
+  const resolved = d[`${key}_save_path`];
+  if (resolved) document.getElementById(`${key}-path`).value = resolved;
+}
+
+async function browsePath(key) {
+  const cur = document.getElementById(`${key}-path`).value;
+  const v   = prompt("저장 폴더 경로를 입력해주세요:\n(탐색기 주소창에서 경로를 복사하세요)", cur);
+  if (v !== null && v.trim()) {
+    document.getElementById(`${key}-path`).value = v.trim();
+    await savePath(key);
+  }
+}
+
+checkGmailStatus();
+</script>
+</body>
+</html>

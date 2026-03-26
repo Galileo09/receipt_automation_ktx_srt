@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Local settings (contains personal paths like desktop paths)
+**/settings.json
+
+# Runtime logs
+log/
+
+# Browser profile data (contains cookies, login sessions - SENSITIVE)
+web_ui/gmail_profile/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,6 +1,12 @@
-PyQt6
-selenium
-webdriver-manager
-nodriver
-pyperclip
-pywebview
+# ── KTX 자동화 ──────────────────
+pywebview==6.1
+requests==2.32.5
+
+# ── SRT 자동화 ──────────────────
+nodriver>=0.48.1
+
+# ── 웹 UI (FastAPI) ──────────────
+fastapi==0.135.1
+uvicorn[standard]==0.42.0
+sse-starlette
+playwright>=1.58.0

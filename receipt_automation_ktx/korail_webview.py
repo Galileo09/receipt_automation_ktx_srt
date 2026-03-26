@@ -246,7 +246,9 @@ def monitor_logic(window, start_date, end_date, save_path):
                         log_message("아래 내용을 복사해서 공유해주세요:")
                         log_message(html_content)
                         log_message("!!! 디버그 HTML 종료 !!!")
-                        recepit_automation_done = True 
+                        recepit_automation_done = True
+                        window.destroy()
+                        break
                     elif result == 'CLICKED_MORE':
                         log_message("현재 화면에 매칭 항목 없음. '더보기' 클릭. 추가 결과 대기 중...")
                         time.sleep(2)
@@ -272,6 +274,8 @@ def monitor_logic(window, start_date, end_date, save_path):
                              log_message(f"총 {len(receipt_queue)}개의 영수증 처리를 시작합니다. 하나씩 인쇄 및 저장합니다...")
                         else:
                              recepit_automation_done = True
+                             window.destroy()
+                             break
 
                     elif result and result.startswith('NO_MATCHES'):
                         debug_info = ""
@@ -279,6 +283,8 @@ def monitor_logic(window, start_date, end_date, save_path):
                             debug_info = result.split('|||')[1]
                         log_message(f"검색 완료. 지정된 날짜 범위 내 영수증이 없습니다. 디버그(처음 5개 상태): {debug_info}")
                         recepit_automation_done = True
+                        window.destroy()
+                        break
                     elif result == 'MISSING_BUTTONS':
                          log_message("조회 버튼이나 기간 설정 버튼을 찾을 수 없습니다.")
                     else:
