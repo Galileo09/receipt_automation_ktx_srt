@@ -17,7 +17,7 @@ def log_message(msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] {msg}")
 
-def monitor_logic(window, start_date, end_date, save_path):
+def monitor_logic(window, start_date, end_date, save_path, manifest_path=""):
     """
     Monitors the current URL and checks for login status on the main page.
     """
@@ -497,6 +497,7 @@ def monitor_logic(window, start_date, end_date, save_path):
                          with open(full_save_path, 'wb') as f:
                              f.write(img_data)
                          log_message(f"저장 완료: {full_save_path}")
+                         append_to_manifest(manifest_path, full_save_path)
                          
                          # Close Modal
                          log_message("모달 닫기 시도...")
@@ -539,15 +540,30 @@ def monitor_logic(window, start_date, end_date, save_path):
             time.sleep(1)
 
 import argparse
+import json
+
+def append_to_manifest(manifest_path: str, filepath: str):
+    """manifest JSON에 저장된 파일 경로 추가"""
+    if not manifest_path:
+        return
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["files"].append(filepath)
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log_message(f"manifest 기록 실패: {e}")
 
 def main():
     today_str = datetime.datetime.now().strftime("%Y%m%d")
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--start_date", help="YYYYMMDD", default=today_str)
     parser.add_argument("--end_date", help="YYYYMMDD", default=today_str)
     parser.add_argument("--save_path", help="Path to save receipts", default=".")
-    
+    parser.add_argument("--manifest", help="Path to manifest JSON", default="")
+
     # Parse args once
     args = parser.parse_args()
 
@@ -565,7 +581,7 @@ def main():
     window = webview.create_window("Korail Receipt Automation", LOGIN_URL, width=1280, height=800)
     
     # Start thread
-    t = threading.Thread(target=monitor_logic, args=(window, args.start_date, args.end_date, args.save_path))
+    t = threading.Thread(target=monitor_logic, args=(window, args.start_date, args.end_date, args.save_path, args.manifest))
     t.daemon = True
     t.start()
     

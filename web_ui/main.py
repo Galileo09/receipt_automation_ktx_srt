@@ -193,6 +193,7 @@ class AutomationState:
         self.auto_send_email: bool = False
         self.new_files: list = []
         self.last_message: str = ""
+        self.manifest_file: Optional[Path] = None  # 이번 실행의 파일 목록 JSON
 
     def write_log(self, line: str):
         ts = datetime.now().strftime("%H:%M:%S")
@@ -205,15 +206,12 @@ class AutomationState:
         return self.process is not None and self.process.returncode is None
 
     def collect_new_files(self) -> list:
-        if not self.save_path or not self.start_time:
+        """이번 실행 manifest JSON에 기록된 파일 목록 반환"""
+        if not self.manifest_file or not self.manifest_file.exists():
             return []
-        p = Path(self.save_path)
-        if not p.exists():
-            return []
-        return sorted(
-            str(f) for f in p.iterdir()
-            if f.is_file() and datetime.fromtimestamp(f.stat().st_mtime) >= self.start_time
-        )
+        import json as _json
+        data = _json.loads(self.manifest_file.read_text(encoding="utf-8"))
+        return [f for f in data.get("files", []) if Path(f).exists()]
 
 
 ktx = AutomationState()
@@ -283,6 +281,14 @@ async def _start_process(state: AutomationState, cmd: list, cwd: Path,
     state.save_path = save_path
     state.auto_send_email = auto_send
     state.new_files = []
+
+    # 이번 실행 전용 manifest JSON 생성
+    ts = state.start_time.strftime("%Y%m%d_%H%M%S")
+    state.manifest_file = LOG_DIR / f"manifest_{label}_{ts}.json"
+    state.manifest_file.write_text(
+        json.dumps({"files": []}, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    cmd += ["--manifest", str(state.manifest_file)]
 
     if load_settings().get("debug_mode", False):
         ts = state.start_time.strftime("%Y%m%d_%H%M%S")

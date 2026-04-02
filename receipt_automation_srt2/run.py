@@ -17,8 +17,8 @@ from srt_manager import SRTManager
 from log import log
 
 
-async def run(start_date: str, end_date: str, save_path: str):
-    manager = SRTManager()
+async def run(start_date: str, end_date: str, save_path: str, manifest: str = ""):
+    manager = SRTManager(manifest_path=manifest)
     try:
         log(f"SRT 자동화 시작 | 기간: {start_date} ~ {end_date} | 저장경로: {save_path}")
         await manager.start_browser()
@@ -39,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--start_date", required=True, help="시작일 (yyyyMMdd)")
     parser.add_argument("--end_date", required=True, help="종료일 (yyyyMMdd)")
     parser.add_argument("--save_path", required=True, help="저장 폴더 경로")
+    parser.add_argument("--manifest", default="", help="manifest JSON 경로")
     args = parser.parse_args()
 
-    asyncio.run(run(args.start_date, args.end_date, args.save_path))
+    asyncio.run(run(args.start_date, args.end_date, args.save_path, args.manifest))

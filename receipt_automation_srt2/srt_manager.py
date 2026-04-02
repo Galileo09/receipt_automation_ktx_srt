@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import nodriver as uc
@@ -8,9 +9,24 @@ from css import CSS
 from jscode import JSCode
 
 
+def _append_to_manifest(manifest_path: str, filepath: str):
+    """manifest JSON에 저장된 파일 경로 추가"""
+    if not manifest_path:
+        return
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["files"].append(filepath)
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log(f"manifest 기록 실패: {e}")
+
+
 class SRTManager:
-    def __init__(self):
+    def __init__(self, manifest_path: str = ""):
         self.browser = None
+        self.manifest_path = manifest_path
 
     async def start_browser(self):
         """브라우저 시작 - user_data_dir로 프로필 유지 (회원 아이디 저장 지원)"""
@@ -245,6 +261,7 @@ class SRTManager:
                             filepath = os.path.join(save_dir, f"{filename}.png")
                             await popup_tab.save_screenshot(filepath)
                             log(f"행 {row_num}: 저장 완료 - {filename}.png")
+                            _append_to_manifest(self.manifest_path, filepath)
                             captured_count += 1
                         
                         # 팝업 닫기
