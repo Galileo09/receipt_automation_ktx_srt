@@ -13,10 +13,10 @@ set VENV_PIP=%VENV_DIR%\Scripts\pip.exe
 set VENV_PLAYWRIGHT=%VENV_DIR%\Scripts\playwright.exe
 
 if not exist "%VENV_PYTHON%" (
-    echo [venv not found] Creating virtual environment...
-    python -m venv "%VENV_DIR%"
+    echo [venv not found] Creating virtual environment with uv...
+    uv venv "%VENV_DIR%"
     if errorlevel 1 (
-        echo [ERROR] Failed to create venv. Make sure Python is installed.
+        echo [ERROR] Failed to create venv. Make sure uv is installed.
         pause
         exit /b 1
     )
@@ -25,7 +25,7 @@ if not exist "%VENV_PYTHON%" (
 )
 
 echo Installing / verifying required packages...
-"%VENV_PIP%" install -r requirements.txt
+uv pip install --python "%VENV_PYTHON%" -r requirements.txt
 echo.
 echo Installing Playwright browser...
 "%VENV_PLAYWRIGHT%" install chromium
